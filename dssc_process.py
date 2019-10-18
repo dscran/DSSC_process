@@ -124,11 +124,11 @@ def prepare_module_empty(scan_variable, framepattern):
     shape = [len_scan, 128, 512]
         
     empty = xr.DataArray(np.zeros(shape, dtype=float), dims=dims, coords=coords)
+    empty_sum_count = xr.DataArray(np.zeros(len_scan, dtype=int), dims=['scan_variable'])
     module_data = xr.Dataset()
     for name in framepattern:
         module_data[name] = empty.copy()
-    
-    module_data['sum_count'] = xr.DataArray(np.zeros(len_scan, dtype=int), dims=['scan_variable'])
+        module_data['sum_count_' + name] = empty_sum_count.copy()
     return module_data
 
 
@@ -160,15 +160,15 @@ def load_chunk_data(sel, sourcename, maxframes=None):
 def merge_chunk_data(module_data, chunk_data, framepattern):
     '''Merge chunk data with prepared dataset for entire module.
     Aligns on "scan_variable" and sums values for variables
-    ['pumped', 'unpumped', 'sum_count']'''
+    ['pumped', 'unpumped', 'sum_count']
+    Concatenate the data along a new dimension ('tmp') and uses
+    the sum() method for automatic dtype conversion'''
     where = dict(scan_variable=chunk_data.scan_variable)
-    for var in framepattern + ['sum_count']:
-        # module_data[var].loc[where] = module_data[var].loc[where] + chunk_data[var]
-        # previous line doesn't convert to larger dtypes when necessary
-        # the next line concatenates the data along a new dimension ('tmp') and uses
-        # the sum() method, which supports automatic conversion
-        summed = xr.concat([module_data[var].loc[where], chunk_data[var]], dim='tmp').sum('tmp')
-        module_data[var].loc[where] = summed
+    for name in framepattern:
+        for prefix in ['', 'sum_count_']:
+            var = prefix + name
+            summed = xr.concat([module_data[var].loc[where], chunk_data[var]], dim='tmp').sum('tmp')
+            module_data[var].loc[where] = summed
     return module_data
 
 
@@ -299,11 +299,14 @@ def process_dssc_module(job):
     for start_index in chunks:
         sel = collection.select_trains(kd.by_index[start_index:start_index + chunksize])
         data = load_chunk_data(sel, sourcename)
+        sum_count = xr.full_like(data[..., 0, 0], fill_value=1)
         if pulsemask is not None:
             data = data.where(pulsemask)
+            sum_count = sum_count.where(pulsemask)
 
         data = split_frames(data, framepattern)
-        data['sum_count'] = xr.full_like(data.trainId, fill_value=1)
+        sum_count = split_frames(sum_count, framepattern, prefix='sum_count_')
+        data = xr.merge([data, sum_count])
         data['scan_variable'] = scan  # aligns on trainId, drops non-matching trains 
         data = data.groupby('scan_variable').sum('trainId')
         module_data = merge_chunk_data(module_data, data, framepattern)
@@ -311,6 +314,6 @@ def process_dssc_module(job):
             pbar.update(1)
     
     for name in framepattern:
-        module_data[name] = module_data[name] / module_data.sum_count
+        module_data[name] = module_data[name] / module_data['sum_count_' + name]
     return module_data
         
