@@ -101,6 +101,7 @@ def load_xgm(run, print_info=False):
 def load_TIM(run, apd='MCP2apd'):
     '''
     Load TIM traces and match them to SASE3 pulses. "run" is a karabo_data.RunDirectory instance.
+    Uses SCS ToolBox.
     '''
     import ToolBox as tb
     
@@ -232,7 +233,7 @@ def process_intra_train(job):
     ntrains = len(collection.train_ids)
     chunks = np.arange(ntrains, step=chunksize)
     if module == 15:
-        pbar = tqdm(total=len(chunks) + 1)
+        pbar = tqdm(total=len(chunks))
     for start_index in chunks:
         sel = collection.select_trains(kd.by_index[start_index:start_index + chunksize])
         data = load_chunk_data(sel, sourcename)
@@ -248,8 +249,6 @@ def process_intra_train(job):
             pbar.update(1)
     
     module_data['image'] = module_data['image'] / module_data.sum_count
-    if module == 15:
-            pbar.update(1)
     return module_data
 
 
@@ -292,7 +291,8 @@ def process_dssc_module(job):
     module_data = prepare_module_empty(scan, framepattern)
     chunks = np.arange(ntrains, step=chunksize)
     if module == 15:
-        pbar = tqdm(total=len(chunks) + 1)
+        # quick and dirty progress bar
+        pbar = tqdm(total=len(chunks))
     for start_index in chunks:
         sel = collection.select_trains(kd.by_index[start_index:start_index + chunksize])
         data = load_chunk_data(sel, sourcename)
@@ -309,7 +309,5 @@ def process_dssc_module(job):
     
     for name in framepattern:
         module_data[name] = module_data[name] / module_data.sum_count
-    if module == 15:
-            pbar.update(1)
     return module_data
         
