@@ -140,7 +140,7 @@ def load_dssc_info(proposal, run_nr):
     return dssc_info
 
 
-def load_chunk_data(sel, sourcename):
+def load_chunk_data(sel, sourcename, maxframes=None):
     '''Load DSSC data (sel is a DataCollection or a subset of a DataCollection
     obtained by its select_trains() method). The flattened multi-index (trains+pulses)
     is unraveled before returning the data.
@@ -154,7 +154,7 @@ def load_chunk_data(sel, sourcename):
     midx = pd.MultiIndex.from_product([sorted(tids), range(fpt)], names=('trainId', 'pulse'))
     data = xr.DataArray(data, dict(trainId_pulse=midx)).unstack('trainId_pulse')
     data = data.transpose('trainId', 'pulse', 'x', 'y')
-    return data
+    return data.loc[{'pulse': np.s_[:maxframes]}]
 
 
 def merge_chunk_data(module_data, chunk_data, framepattern):
@@ -219,14 +219,17 @@ def process_intra_train(job):
     run_nr = job['run_nr']
     module = job['module']
     chunksize = job['chunksize']
+    fpt = job['fpt']
+    maxframes = job.get('maxframes', None)  # optional
     
     sourcename = f'SCS_DET_DSSC1M-1/DET/{module}CH0:xtdf'
     collection = load_run_selective(proposal, run_nr, include=f'DSSC{module:02d}')
     
-    fpt = load_dssc_info(proposal, run_nr)['frames_per_train']
+    fpt = min(fpt, maxframes) if maxframes is not None else fpt
     dims = ['pulse', 'x', 'y']
+    coords = {'pulse': np.arange(fpt, dtype=int)}
     shape = [fpt, 128, 512]
-    module_data = xr.DataArray(np.zeros(shape, dtype=float), dims=dims)
+    module_data = xr.DataArray(np.zeros(shape, dtype=float), dims=dims, coords=coords)
     module_data = module_data.to_dataset(name='image')
     module_data['sum_count'] = xr.DataArray(np.zeros(fpt, dtype=int), dims=['pulse'])
     
@@ -236,14 +239,14 @@ def process_intra_train(job):
         pbar = tqdm(total=len(chunks))
     for start_index in chunks:
         sel = collection.select_trains(kd.by_index[start_index:start_index + chunksize])
-        data = load_chunk_data(sel, sourcename)
+        data = load_chunk_data(sel, sourcename, maxframes)
         data = data.to_dataset(name='image')
         
-        data['sum_count'] = xr.full_like(data.trainId, fill_value=1)
+        data['sum_count'] = xr.full_like(data.image[..., 0, 0], fill_value=1)
         data = data.sum('trainId')
 
         for var in ['image', 'sum_count']:
-            # concatenating and using the sum-method automatically takes care of dtype casting if necessary
+            # concatenating and using the sum() method automatically takes care of dtype casting if necessary
             module_data[var] = xr.concat([module_data[var], data[var]], dim='tmp').sum('tmp')
         if module == 15:
             pbar.update(1)
