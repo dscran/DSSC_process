@@ -244,7 +244,7 @@ def process_intra_train(job):
 
         for var in ['image', 'sum_count']:
             # concatenating and using the sum-method automatically takes care of dtype casting if necessary
-            module_data = xr.concat([module_data[var], chunk_data[var]], dim='tmp').sum('tmp')
+            module_data[var] = xr.concat([module_data[var], data[var]], dim='tmp').sum('tmp')
         if module == 15:
             pbar.update(1)
     
