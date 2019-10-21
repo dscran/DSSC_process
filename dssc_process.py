@@ -145,7 +145,9 @@ def load_chunk_data(sel, sourcename, maxframes=None):
     obtained by its select_trains() method). The flattened multi-index (trains+pulses)
     is unraveled before returning the data.
     '''
-    fpt = sel.detector_info(sourcename)['frames_per_train']
+    info = sel.detector_info(sourcename)
+    fpt = info['frames_per_train']
+    frames_total = info['total_frames']
     data = sel.get_array(sourcename, 'image.data', extra_dims=['_empty_', 'x', 'y']).squeeze()
     
     tids = np.unique(data.trainId)
@@ -273,7 +275,7 @@ def process_dssc_module(job):
     module = job['module']
     chunksize = job['chunksize']
     scanfile = job['scanfile']
-    framepattern = job['framepattern']
+    framepattern = job.get('framepattern', ['image'])
     maskfile = job.get('maskfile', None)
     
     sourcename = f'SCS_DET_DSSC1M-1/DET/{module}CH0:xtdf'
@@ -298,15 +300,17 @@ def process_dssc_module(job):
         pbar = tqdm(total=len(chunks))
     for start_index in chunks:
         sel = collection.select_trains(kd.by_index[start_index:start_index + chunksize])
-        data = load_chunk_data(sel, sourcename)
-        if pulsemask is not None:
-            data = data.where(pulsemask)
+        nframes = sel.detector_info(sourcename)['total_frames']
+        if nframes > 0:  # some chunks have no DSSC data at all
+            data = load_chunk_data(sel, sourcename)
+            if pulsemask is not None:
+                data = data.where(pulsemask)
 
-        data = split_frames(data, framepattern)
-        data['sum_count'] = xr.full_like(data.trainId, fill_value=1)
-        data['scan_variable'] = scan  # aligns on trainId, drops non-matching trains 
-        data = data.groupby('scan_variable').sum('trainId')
-        module_data = merge_chunk_data(module_data, data, framepattern)
+            data = split_frames(data, framepattern)
+            data['sum_count'] = xr.full_like(data.trainId, fill_value=1)
+            data['scan_variable'] = scan  # aligns on trainId, drops non-matching trains 
+            data = data.groupby('scan_variable').sum('trainId')
+            module_data = merge_chunk_data(module_data, data, framepattern)
         if module == 15:
             pbar.update(1)
     
