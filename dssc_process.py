@@ -307,11 +307,15 @@ def process_dssc_module(job):
         nframes = sel.detector_info(sourcename)['total_frames']
         if nframes > 0:  # some chunks have no DSSC data at all
             data = load_chunk_data(sel, sourcename)
+            sum_count = xr.full_like(data[..., 0, 0], fill_value=1)
             if pulsemask is not None:
                 data = data.where(pulsemask)
-
+                sum_count = sum_count.where(pulsemask)
+            
             data = split_frames(data, framepattern)
-            data['sum_count'] = xr.full_like(data.trainId, fill_value=1)
+            sum_count = split_frames(sum_count, framepattern, prefix='sum_count_')
+            data = xr.merge([data, sum_count])
+            
             data['scan_variable'] = scan  # aligns on trainId, drops non-matching trains 
             data = data.groupby('scan_variable').sum('trainId')
             module_data = merge_chunk_data(module_data, data, framepattern)
