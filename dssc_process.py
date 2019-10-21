@@ -2,6 +2,9 @@
 '''
 @author: Michael Schneider, with input from XFEL-CAS and SCS beamline staff
 
+karabo_data: https://github.com/European-XFEL/karabo_data
+SCS ToolBox: https://git.xfel.eu/gitlab/SCS/ToolBox
+
 '''
 
 import numpy as np
@@ -56,7 +59,8 @@ def load_run_selective(proposal, run_nr, include=None, exclude=None, maxfiles=No
 def load_scan_variable(run, scan_variable, stepsize=None):
     '''
     Loads the given scan variable and rounds scan positions to integer multiples of "stepsize"
-    for consistent grouping. Creates a dummy scan if scan_variable is set to None.
+    for consistent grouping (except for stepsize=None).
+    Returns a dummy scan if scan_variable is set to None.
     Parameters:
         run : (karabo_data.DataCollection) RunDirectory instance
         scan_variable : (tuple of str) ("source name", "value path"), examples:
@@ -124,11 +128,11 @@ def prepare_module_empty(scan_variable, framepattern):
     shape = [len_scan, 128, 512]
         
     empty = xr.DataArray(np.zeros(shape, dtype=float), dims=dims, coords=coords)
+    empty_sum_count = xr.DataArray(np.zeros(len_scan, dtype=int), dims=['scan_variable'])
     module_data = xr.Dataset()
     for name in framepattern:
         module_data[name] = empty.copy()
-    
-    module_data['sum_count'] = xr.DataArray(np.zeros(len_scan, dtype=int), dims=['scan_variable'])
+        module_data['sum_count_' + name] = empty_sum_count.copy()
     return module_data
 
 
@@ -162,20 +166,20 @@ def load_chunk_data(sel, sourcename, maxframes=None):
 def merge_chunk_data(module_data, chunk_data, framepattern):
     '''Merge chunk data with prepared dataset for entire module.
     Aligns on "scan_variable" and sums values for variables
-    ['pumped', 'unpumped', 'sum_count']'''
+    ['pumped', 'unpumped', 'sum_count']
+    Concatenates the data along a new dimension ('tmp') and uses
+    the sum() method for automatic dtype conversion'''
     where = dict(scan_variable=chunk_data.scan_variable)
-    for var in framepattern + ['sum_count']:
-        # module_data[var].loc[where] = module_data[var].loc[where] + chunk_data[var]
-        # previous line doesn't convert to larger dtypes when necessary
-        # the next line concatenates the data along a new dimension ('tmp') and uses
-        # the sum() method, which supports automatic conversion
-        summed = xr.concat([module_data[var].loc[where], chunk_data[var]], dim='tmp').sum('tmp')
-        module_data[var].loc[where] = summed
+    for name in framepattern:
+        for prefix in ['', 'sum_count_']:
+            var = prefix + name
+            summed = xr.concat([module_data[var].loc[where], chunk_data[var]], dim='tmp').sum('tmp')
+            module_data[var].loc[where] = summed
     return module_data
 
 
 def split_frames(data, pattern, prefix=''):
-    '''Split frames according to "pattern" and average over resulting splits.
+    '''Split frames according to "pattern" (possibly repeating) and average over resulting splits.
     "pattern" is a list of frame names (order matters!). Examples:
         pattern = ['pumped', 'pumped_dark', 'unpumped', 'unpumped_dark']  # 4 DSSC frames, 2 FEL pulses
         pattern = ['pumped', 'unpumped']  # 2 FEL frames, no intermediate darks
@@ -315,6 +319,6 @@ def process_dssc_module(job):
             pbar.update(1)
     
     for name in framepattern:
-        module_data[name] = module_data[name] / module_data.sum_count
+        module_data[name] = module_data[name] / module_data['sum_count_' + name]
     return module_data
         
