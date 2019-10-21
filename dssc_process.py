@@ -212,6 +212,17 @@ def calc_xgm_frame_indices(nbunches, framepattern):
     return np.sort(np.concatenate(frame_indices))
 
 
+def apply_frame_threshold(data, dark, threshold):
+    '''subtract per-frame dark image and apply simple threshold. Scales the result
+    to maintain total scattered intensity.'''
+    mean_before = data.mean(['x', 'y'])
+    data = data - dark
+    data = data.where(data > threshold, other=0)
+    mean_after = data.mean(['x', 'y'])
+    data = data * mean_before / mean_after
+    return data
+
+
 def process_intra_train(job):
     '''Aggregate DSSC data (chunked, to fit into memory) for a single module.
     Averages over all trains, but keeps all pulses.
@@ -279,18 +290,24 @@ def process_dssc_module(job):
     module = job['module']
     chunksize = job['chunksize']
     scanfile = job['scanfile']
+    darkfile = job['darkfile']
+    photon_threshold = job['photon_threshold']
     framepattern = job.get('framepattern', ['image'])
     maskfile = job.get('maskfile', None)
+    
     
     sourcename = f'SCS_DET_DSSC1M-1/DET/{module}CH0:xtdf'
     
     collection = load_run_selective(proposal, run_nr, include=f'DSSC{module:02d}')
-        
     ntrains = len(collection.train_ids)
     
     # read preprocessed scan variable from file - selection and (possibly) rounding already done.
     scan = xr.open_dataarray(scanfile, 'data', autoclose=True)
 
+    # load train-averaged (but not pulse-averaged) dark file for photon thresholding
+    dark = xr.open_dataset(darkfile, 'data', autoclose=True)['image']
+    dark = dark.loc[{'module': module}]
+    
     # read binary pulse/train mask - e.g. from XGM thresholding
     if maskfile is not None:
         pulsemask = xr.open_dataarray(maskfile, 'data', autoclose=True)
@@ -300,13 +317,16 @@ def process_dssc_module(job):
     module_data = prepare_module_empty(scan, framepattern)
     chunks = np.arange(ntrains, step=chunksize)
     if module == 15:
-        # quick and dirty progress bar
+        # quick and dirty progress bar - would be better to use a multiprocessing.Manager instance
+        # but I can't be bothered...
         pbar = tqdm(total=len(chunks))
     for start_index in chunks:
         sel = collection.select_trains(kd.by_index[start_index:start_index + chunksize])
         nframes = sel.detector_info(sourcename)['total_frames']
         if nframes > 0:  # some chunks have no DSSC data at all
             data = load_chunk_data(sel, sourcename)
+            if photon_threshold is not None:
+                data = apply_frame_threshold(data, dark, photon_threshold)
             sum_count = xr.full_like(data[..., 0, 0], fill_value=1)
             if pulsemask is not None:
                 data = data.where(pulsemask)
