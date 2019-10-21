@@ -2,6 +2,9 @@
 '''
 @author: Michael Schneider, with input from XFEL-CAS and SCS beamline staff
 
+karabo_data: https://github.com/European-XFEL/karabo_data
+SCS ToolBox: https://git.xfel.eu/gitlab/SCS/ToolBox
+
 '''
 
 import numpy as np
@@ -56,7 +59,8 @@ def load_run_selective(proposal, run_nr, include=None, exclude=None, maxfiles=No
 def load_scan_variable(run, scan_variable, stepsize=None):
     '''
     Loads the given scan variable and rounds scan positions to integer multiples of "stepsize"
-    for consistent grouping. Creates a dummy scan if scan_variable is set to None.
+    for consistent grouping (except for stepsize=None).
+    Returns a dummy scan if scan_variable is set to None.
     Parameters:
         run : (karabo_data.DataCollection) RunDirectory instance
         scan_variable : (tuple of str) ("source name", "value path"), examples:
@@ -161,7 +165,7 @@ def merge_chunk_data(module_data, chunk_data, framepattern):
     '''Merge chunk data with prepared dataset for entire module.
     Aligns on "scan_variable" and sums values for variables
     ['pumped', 'unpumped', 'sum_count']
-    Concatenate the data along a new dimension ('tmp') and uses
+    Concatenates the data along a new dimension ('tmp') and uses
     the sum() method for automatic dtype conversion'''
     where = dict(scan_variable=chunk_data.scan_variable)
     for name in framepattern:
@@ -173,7 +177,7 @@ def merge_chunk_data(module_data, chunk_data, framepattern):
 
 
 def split_frames(data, pattern, prefix=''):
-    '''Split frames according to "pattern" and average over resulting splits.
+    '''Split frames according to "pattern" (possibly repeating) and average over resulting splits.
     "pattern" is a list of frame names (order matters!). Examples:
         pattern = ['pumped', 'pumped_dark', 'unpumped', 'unpumped_dark']  # 4 DSSC frames, 2 FEL pulses
         pattern = ['pumped', 'unpumped']  # 2 FEL frames, no intermediate darks
