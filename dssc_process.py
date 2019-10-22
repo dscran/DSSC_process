@@ -215,11 +215,11 @@ def calc_xgm_frame_indices(nbunches, framepattern):
 def apply_frame_threshold(data, dark, threshold):
     '''subtract per-frame dark image and apply simple threshold. Scales the result
     to maintain total scattered intensity.'''
-    mean_before = data.mean(['x', 'y'])
+    # mean_before = data.mean(['x', 'y'])
     data = data - dark
     data = data.where(data > threshold, other=0)
-    mean_after = data.mean(['x', 'y'])
-    data = data * mean_before / mean_after
+    # mean_after = data.mean(['x', 'y'])
+    # data = data * mean_before / mean_after
     return data
 
 
