@@ -3,6 +3,9 @@ python notebooks to process DSSC data recorded at the SCS beamline of the Europe
 
 ## Basic concepts
 The purpose of this library is to condense DSSC data following these basic ideas:
+* grouping by an arbitraty scan variable
+* arbitray frame patterns within each train
+* rejection of single frames and/or trains
 
 ### grouping by another variable
 The images need to be grouped by some (non-DSSC) variable (`scan_variable`) and subsequently averaged. The scan variable is a function of the trainId. Common examples include the photon energy, the delay in a pump-probe experiment, gas attenuator transmission, or the sample stage position. The scan variable is loaded (and possibly manipulated) in an interactive session and then written out into a temporary file for use during the actual data processing. ___Note that trainIds that are missing in the scan variable file will not be considered during processing!___
