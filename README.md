@@ -3,8 +3,8 @@ python notebooks to process DSSC data recorded at the SCS beamline of the Europe
 
 ## Basic concepts
 The purpose of this library is to condense DSSC data following these basic ideas:
-* grouping by an arbitraty scan variable
-* arbitray frame patterns within each train
+* grouping by an arbitrary scan variable
+* arbitrary frame patterns within each train
 * rejection of single frames and/or trains
 
 ### grouping by another variable
