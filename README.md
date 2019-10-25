@@ -15,7 +15,7 @@ Within each train, the DSSC frames fall into a (typically repeating) pattern (`f
 ### frame and train rejection
 Often, DSSC frames need to be excluded from processing on a per-frame and per-train basis. This may again be decided on the basis of another variable, e.g., x-ray intensity monitors. The rejection is handled by another (optional) temporary file, called `framemask`. This is a boolean array with a shape (trains, frames). Every frame for which the corresponding framemask entry is `False`, will not be considered during processing. ___Similar to the scan variable, this is also the case for frames and trains that are missing in the mask file!___
 
-As a special case, the `maxframes` parameter limits the number of DSSC frames for the entire run. This is useful for runs in which the number of frames recorded per train was misconfigured and doesn't match the XFEL pulse number. This can also be achieved using a frame mask, but requires less computation and is thus faster.
+As a special case, the `maxframes` parameter limits the number of DSSC frames per train for the entire run. This is useful for runs in which the number of frames recorded per train was misconfigured and doesn't match the XFEL pulse number. This can also be achieved using a frame mask, but requires less computation and is thus faster.
 
 
 ## Data handling concept
