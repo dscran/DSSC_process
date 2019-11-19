@@ -220,6 +220,7 @@ def process_intra_train(job):
       run : (int) run number
       module : (int) DSSC module to process
       chunksize : (int) number of trains to process simultaneously
+      fpt : (int) frames per train
     '''
     proposal = job['proposal']
     run_nr = job['run_nr']
