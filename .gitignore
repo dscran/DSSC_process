@@ -6,3 +6,5 @@ __pycache__
 *.h5
 .ipynb_checkpoints/
 tmp*
+images*
+processed_runs*

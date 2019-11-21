@@ -24,38 +24,6 @@ def find_run_dir(proposal, run):
     return os.path.join(proposal_dir, f'raw/r{run:04d}')
 
 
-def load_run_selective(proposal, run_nr, include=None, exclude=None, maxfiles=None):
-    '''
-    Finds the rundirectory for the given (integer) proposal and run numbers and returns
-    a karabo_data.DataCollection instance. Files can be selected or excluded based on
-    filenames. Setting any of the optional paramters to None disables that particular
-    selection.
-    
-    Parameters
-    ==========
-    proposal :: int
-        proposal number
-    run_nr :: int
-        run number
-    include :: str
-        Load only files that have this string in the filename
-    exclude :: str
-        Skip files with this string in the filename
-    maxfiles :: int
-        Load at most this many files
-    '''
-    rundir = find_run_dir(proposal, run_nr)
-    flist = glob(os.path.join(rundir, '*h5'))
-
-    if include is not None:
-        flist = [f for f in flist if include in f]
-
-    if exclude is not None:
-        flist = [f for f in flist if exclude not in f]
-    
-    return kd.DataCollection.from_paths(flist[:maxfiles])
-
-
 def load_scan_variable(run, scan_variable, stepsize=None):
     '''
     Loads the given scan variable and rounds scan positions to integer multiples of "stepsize"
@@ -139,7 +107,7 @@ def prepare_module_empty(scan_variable, framepattern):
 def load_dssc_info(proposal, run_nr):
     '''Loads the first data file for DSSC module 0 (this is hardcoded) and
     returns the detector_info dictionary'''
-    dssc_module = load_run_selective(proposal, run_nr, include='DSSC00', maxfiles=1)
+    dssc_module = kd.open_run(proposal, run_nr, include='*DSSC00*')
     dssc_info = dssc_module.detector_info('SCS_DET_DSSC1M-1/DET/0CH0:xtdf')
     return dssc_info
 
@@ -230,7 +198,7 @@ def process_intra_train(job):
     maxframes = job.get('maxframes', None)  # optional
     
     sourcename = f'SCS_DET_DSSC1M-1/DET/{module}CH0:xtdf'
-    collection = load_run_selective(proposal, run_nr, include=f'DSSC{module:02d}')
+    collection = kd.open_run(proposal, run_nr, include=f'*DSSC{module:02d}*')
     
     fpt = min(fpt, maxframes) if maxframes is not None else fpt
     dims = ['pulse', 'x', 'y']
@@ -285,7 +253,7 @@ def process_dssc_module(job):
     
     sourcename = f'SCS_DET_DSSC1M-1/DET/{module}CH0:xtdf'
     
-    collection = load_run_selective(proposal, run_nr, include=f'DSSC{module:02d}')
+    collection = kd.open_run(proposal, run_nr, include=f'*DSSC{module:02d}*')
         
     ntrains = len(collection.train_ids)
     
